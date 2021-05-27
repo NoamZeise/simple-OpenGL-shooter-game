@@ -70,3 +70,6 @@ fpGame.vcxproj.filters
 fpGame.vcxproj
 assimp-vc140-mt.lib
 assimp-vc140-mt.dll
+file.json
+file
+.vscode/settings.json
