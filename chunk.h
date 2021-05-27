@@ -13,7 +13,7 @@
 class Chunk
 {
 public:
-	Chunk(glm::vec3 position, float chunkWidth, float chunkHeight, Model* ground, Model* tree, std::mt19937* mRandomGen);
+	Chunk(glm::vec3 position, float chunkWidth, float chunkHeight, Model* ground, Model* tree, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnXRange, std::uniform_real_distribution<float>& spawnZRange, std::uniform_int_distribution<int>& treeRange);
 	~Chunk();
 	void Draw(Shader& shader, Camera& camera);
 	glm::vec3 getPos();
@@ -25,7 +25,6 @@ private:
 	Model* ground, *tree;
 	float treeShininess = 5.0f;
 	float groundShininess = 10.0f;
-	unsigned int maxTrees = 30;
 };
 
 

@@ -6,11 +6,12 @@
 
 #include <vector>
 #include <random>
+#include <ctime>
 #include <iostream>
 #include "camera.h"
 
 
-Chunk::Chunk(glm::vec3 position, float chunkWidth, float chunkHeight, Model* ground, Model* tree, std::mt19937* mRandomGen)
+Chunk::Chunk(glm::vec3 position, float chunkWidth, float chunkHeight, Model* ground, Model* tree, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnXRange, std::uniform_real_distribution<float>& spawnZRange, std::uniform_int_distribution<int>& treeRange)
 {
 	this->ground = ground;
 	this->tree = tree;
@@ -18,18 +19,15 @@ Chunk::Chunk(glm::vec3 position, float chunkWidth, float chunkHeight, Model* gro
 	this->chunkHeight = chunkHeight;
 	this->position = position;
 
-	std::uniform_real_distribution<float> spawnXRange = std::uniform_real_distribution<float>(-(chunkWidth / 2), (chunkWidth / 2));
-	std::uniform_real_distribution<float> spawnZRange = std::uniform_real_distribution<float>(-(chunkHeight / 2), (chunkHeight / 2));
-	std::uniform_int_distribution<int> treeRange = std::uniform_int_distribution<int>(0, maxTrees);
-
-	unsigned int numTrees = treeRange(*mRandomGen);
+	unsigned int numTrees = treeRange(randomGen);
 	for (unsigned int i = 0; i < numTrees; i++)
 	{
 		glm::vec3 pos = position;
-		pos.x += spawnXRange(*mRandomGen);
-		pos.z += spawnZRange(*mRandomGen);
+		pos.x += spawnXRange(randomGen);
+		pos.z += spawnZRange(randomGen);
 		treePositions.push_back(pos);
 	}
+	std::cout << std::endl;
 }
 Chunk::~Chunk()
 {

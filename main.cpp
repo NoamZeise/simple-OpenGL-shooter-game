@@ -7,55 +7,98 @@
 
 #include <iostream>
 #include <random>
+#include <fstream>
+#include <string>
+#include <ctime>
+#include <stdlib.h>
 #include "shader.h"
 #include "camera.h"
 #include "model.h"
-#include "chunk.h"
 #include "gameObject.h"
 #include "projectile.h"
 #include "enemy.h"
+#include "chunk.h"
 
-float PreviousFrameTime = 0.0f;
-float TimeElapsed = 0.0f;
-
-Camera camera;
-int ScreenWidth = 1600;
-int ScreenHeight = 900;
 static void error_callback(int error, const char* description);
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 
-const float chunkWidth = 30.0f;
-const float chunkHeight = 30.0f;
-int numChunks;
-int range;
-std::vector<Chunk> chunks;
-std::mt19937 mRandomGen;
-glm::vec3 currentSquare(0.0f);
-
-std::vector<Projectile> bullets;
-float shotDelay = 0.1f;
-float shotTimer = 0.1f;
-
-std::vector<Enemy> enemies;
-float enemyDelay = 5.0f;
-float enemyTimer = 0.0f;
-
-float danger = 0.0f;
-
-Model groundMdl;
-Model treeMdl;
-Model bulletMdl;
-Model enemyMdl;
-Model skyModel;
-glm::vec3 skyBoxColour = glm::vec3(91.0f / 255.0f, 110.0f / 255.0f, 225.0f / 255.0f);
-
-void AddChunks();
-void AddBullet();
-void AddEnemies();
+void saveHighscore(int& score, int& highscore);
+void AddChunks(Camera& camera, std::vector<Chunk>& chunks, glm::vec3 currentSquare, int numChunks, float chunkWidth, float chunkHeight, Model& groundMdl, Model& treeMdl, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnXRange, std::uniform_real_distribution<float>& spawnZRange, std::uniform_int_distribution<int>& treeRange);
+void AddProjectile(std::vector<Projectile>& projectiles, Camera& camera, Model& bulletMdl, float& shotTimer, float SHOT_DELAY);
+void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl, Camera& camera, std::mt19937& randomGen, float& enemyTimer, float enemyDelay, bool enemiesEnabled, std::uniform_real_distribution<float>& spawnDirection, std::uniform_real_distribution<float>& spawnHeight, std::uniform_int_distribution<int>& spawnQuadrant);
 
 int main()
 {
+	float PreviousFrameTime = 0.0f;
+	float TimeElapsed = 0.0f;
+
+	Camera camera;
+	int ScreenWidth = 1600;
+	int ScreenHeight = 900;
+
+
+	const float CHUNK_WIDTH = 30.0f;
+	const float CHUNK_HEIGHT = 30.0f;
+	const int MAX_TREES = 30;
+	int numChunks;
+	int range;
+	std::vector<Chunk> chunks;
+	std::mt19937 randomGen(time(0));
+	std::uniform_real_distribution<float> spawnXRange = std::uniform_real_distribution<float>(-(CHUNK_WIDTH / 2), (CHUNK_WIDTH / 2));
+	std::uniform_real_distribution<float> spawnZRange = std::uniform_real_distribution<float>(-(CHUNK_HEIGHT / 2), (CHUNK_HEIGHT / 2));
+	std::uniform_int_distribution<int> treeRange = std::uniform_int_distribution<int>(0, MAX_TREES);
+	glm::vec3 currentSquare(0.0f);
+
+	std::vector<Projectile> projectiles;
+	const float SHOT_DELAY = 0.1f;
+	float shotTimer = 0.1f;
+
+	std::vector<Enemy> enemies;
+	bool enemiesEnabled = true;
+	float enemyDelay = 6.0f;
+	const float INITIAL_ENEMY_DELAY = 6.0f;
+	float enemyTimer = 0.0f;
+	const float DIFFICULTY_DELAY = 5.0f;
+	float difficultyTimer = 0.0f;
+	std::uniform_real_distribution<float> spawnDirection = std::uniform_real_distribution<float>(0.0f, 90.0f);
+	std::uniform_real_distribution<float> spawnHeight = std::uniform_real_distribution<float>(0.1f, 10.0f);
+	std::uniform_int_distribution<int> spawnQuadrant = std::uniform_int_distribution<int>(0, 1);
+
+	int highscore = 0;
+	int score = 0;
+
+	const float DANGER_RANGE = 30.0f;
+	float danger = 0.0f;
+
+	Model groundMdl;
+	Model treeMdl;
+	Model bulletMdl;
+	Model enemyMdl;
+	Model skyModel;
+	glm::vec3 skyBoxColour = glm::vec3(91.0f / 255.0f, 110.0f / 255.0f, 225.0f / 255.0f);
+
+
+	std::ifstream loadHscore{ "highscore" };
+	if (loadHscore)
+	{
+		std::string fileData;
+		loadHscore >> fileData;
+		errno = 0;
+		char* endptr;
+		const char* buffer = fileData.c_str();
+		highscore = strtol(buffer, &endptr, 0);
+
+		if (errno == ERANGE || endptr == buffer)
+		{
+			std::cout << "invalid highsore file" << std::endl;
+			highscore = 0;
+		}
+	}
+	loadHscore.close();
+
+	std::cout << "\n\n\n\n\n\n\n\n\n\n\nHighscore: " << highscore << std::endl;
+
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit())
 	{
@@ -98,7 +141,7 @@ int main()
 
 	std::random_device rd{};
 	std::mt19937 engine{ rd() };
-	mRandomGen = engine;
+	randomGen = engine;
 	range = (int)(camera.getRenderDistance() + 100.0f);
 	numChunks = 3;
 
@@ -117,43 +160,62 @@ int main()
 		float currentFrame = (float)glfwGetTime();
 		TimeElapsed = currentFrame - PreviousFrameTime;
 		PreviousFrameTime = currentFrame;
-		for (unsigned int i = 0; i < bullets.size(); i++)
+		for (unsigned int i = 0; i < projectiles.size(); i++)
 		{
 			bool collided = false;
 			for (unsigned int j = 0; j < enemies.size(); j++)
 			{
-				if (enemies[j].Colliding(bullets[i].getPos()))
+				if (enemies[j].Colliding(projectiles[i].getPos()))
 				{
 					enemies.erase(enemies.begin() + j--);
 					collided = true;
+					score++;
+					std::cout << "\n\n\n\n\n\n\n\n\n\n\nHighscore: " << highscore <<  "\nScore:     " << score << std::endl;
 				}
 			}
 			if (collided)
 			{
-				bullets.erase(bullets.begin() + i--);
+				projectiles.erase(projectiles.begin() + i--);
 			}
 		}
 		danger = 0.0f;
 		for (unsigned int i = 0; i < enemies.size(); i++)
 		{
-			if (glm::distance(enemies[i].getPos(), camera.getPos()) < 30.0f)
+			if (glm::distance(enemies[i].getPos(), camera.getPos()) < DANGER_RANGE)
 			{
-				auto tempDanger =  1.0f - ((glm::distance(enemies[i].getPos(), camera.getPos()) + 1.0f) / 16.0f);
+				auto tempDanger =  1.0f - ((glm::distance(enemies[i].getPos(), camera.getPos()) + 1.0f) / DANGER_RANGE);
 				if (tempDanger > danger)
 					danger = tempDanger;
 			}
 			if (enemies[i].Colliding(camera.getPos()))
 			{
 				enemies.clear();
-				bullets.clear();
+				projectiles.clear();
 				chunks.clear();
+				std::cout << "\n\n\n\n\n\n\n\n\n\n\nYOU DIED\nHighscore: " << highscore << "\nFinal Score: " << score << std::endl;
+				if(score > highscore)
+					highscore = score;
+				score = 0;
+				enemyDelay = INITIAL_ENEMY_DELAY;
 			}
 		}
 
+		difficultyTimer += TimeElapsed;
+		if (difficultyTimer > DIFFICULTY_DELAY)
+		{
+			difficultyTimer = 0.0f;
+			enemyDelay -= 0.2f;
+			if (enemyDelay < 1.0f)
+				enemyDelay = 1.0f;
+		}
+
 		camera.KeyHandler(window, TimeElapsed);
+		double xPos, yPos;
+		glfwGetCursorPos(window, &xPos , &yPos);
+		camera.CursorPosCallback(window, xPos, yPos, TimeElapsed);
 		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
 		{
-			AddBullet();
+			AddProjectile(projectiles, camera, bulletMdl, shotTimer, SHOT_DELAY);
 		}
 		if (glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS)
 		{
@@ -163,11 +225,11 @@ int main()
 		{
 			chunks.clear();
 			enemies.clear();
-			bullets.clear();
+			projectiles.clear();
 		}
 
 
-		AddEnemies();
+		AddEnemies(enemies, enemyMdl, camera, randomGen, enemyTimer, enemyDelay, enemiesEnabled, spawnDirection, spawnHeight, spawnQuadrant);
 
 		//-----------------------------------------
 		//draw
@@ -211,10 +273,10 @@ int main()
 		for (unsigned int i = 0; i < chunks.size(); i++)
 		{
 			auto chunkPos = chunks[i].getPos();
-			chunkPos.x -= chunkWidth / 2;
-			chunkPos.z -= chunkHeight / 2;
-			if (currentPos.x > chunkPos.x - 1.0f && currentPos.x < chunkPos.x + chunkWidth + 1.0f &&
-				currentPos.z > chunkPos.z - 1.0f && currentPos.z < chunkPos.z + chunkHeight + 1.0f)
+			chunkPos.x -= CHUNK_WIDTH / 2;
+			chunkPos.z -= CHUNK_HEIGHT / 2;
+			if (currentPos.x > chunkPos.x - 1.0f && currentPos.x < chunkPos.x + CHUNK_WIDTH + 1.0f &&
+				currentPos.z > chunkPos.z - 1.0f && currentPos.z < chunkPos.z + CHUNK_HEIGHT + 1.0f)
 			{
 				collidingChunks.push_back(&chunks[i]);
 			}
@@ -230,7 +292,7 @@ int main()
 			chunks.clear();
 			currentSquare.x = camera.getPos().x;
 			currentSquare.z = camera.getPos().z;
-			AddChunks();
+			AddChunks(camera, chunks, currentSquare, numChunks, CHUNK_WIDTH, CHUNK_HEIGHT, groundMdl, treeMdl, randomGen, spawnXRange, spawnZRange, treeRange);
 		}
 		else
 		{
@@ -246,20 +308,20 @@ int main()
 			{
 				currentSquare.x = collidingChunks[0]->getPos().x;
 				currentSquare.z = collidingChunks[0]->getPos().z;
-				AddChunks();
+				AddChunks(camera, chunks, currentSquare, numChunks, CHUNK_WIDTH, CHUNK_HEIGHT, groundMdl, treeMdl, randomGen, spawnXRange, spawnZRange, treeRange);
 			}
 		}
 
 
 		shotTimer += TimeElapsed;
-		for (unsigned int i = 0; i < bullets.size(); i++)
+		for (unsigned int i = 0; i < projectiles.size(); i++)
 		{
-			bullets[i].Update(TimeElapsed);
-			bullets[i].Draw(objectShader, camera);
+			projectiles[i].Update(TimeElapsed);
+			projectiles[i].Draw(objectShader, camera);
 
-			if (glm::distance(bullets[i].getPos(), camera.getPos()) > range * 2)
+			if (glm::distance(projectiles[i].getPos(), camera.getPos()) > range * 2)
 			{
-				bullets.erase(bullets.begin() + i--);
+				projectiles.erase(projectiles.begin() + i--);
 			}
 		}
 		enemyTimer += TimeElapsed;
@@ -280,9 +342,20 @@ int main()
 	window = nullptr;
 	glfwTerminate();
 
+	saveHighscore(score, highscore);
 }
 
-void AddChunks()
+void saveHighscore(int& score, int& highscore)
+{
+	if (score > highscore)
+		highscore = score;
+	std::ofstream hscoreFile{ "highscore" };
+	hscoreFile.clear();
+	hscoreFile << highscore;
+	hscoreFile.close();
+}
+
+void AddChunks(Camera& camera, std::vector<Chunk>& chunks, glm::vec3 currentSquare, int numChunks, float chunkWidth, float chunkHeight, Model& groundMdl, Model& treeMdl, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnXRange, std::uniform_real_distribution<float>& spawnZRange, std::uniform_int_distribution<int>& treeRange)
 {
 	//std::cout << "adding chunks" << std::endl;
 	glm::vec3 currentPos = glm::vec3(camera.getPos());
@@ -306,36 +379,33 @@ void AddChunks()
 			if (!chunkFound)
 			{
 				//std::cout << "chunk added" << std::endl;
-				chunks.push_back(Chunk(glm::vec3(x, 0.0f, z), chunkWidth, chunkHeight, &groundMdl, &treeMdl, &mRandomGen));
+				chunks.push_back(Chunk(glm::vec3(x, 1.0f, z), chunkWidth, chunkHeight, &groundMdl, &treeMdl, randomGen, spawnXRange, spawnZRange, treeRange));
 			}
 		}
 	}
 }
 
-void AddBullet()
+void AddProjectile(std::vector<Projectile>& projectiles, Camera& camera, Model& bulletMdl, float& shotTimer, float SHOT_DELAY)
 {
-	if (shotTimer > shotDelay)
+	if (shotTimer > SHOT_DELAY)
 	{
-		bullets.push_back(Projectile(camera.getPos(), glm::normalize(camera.getFront()), &bulletMdl));
+		projectiles.push_back(Projectile(camera.getPos(), glm::normalize(camera.getFront()), &bulletMdl));
 		shotTimer = 0.0f;
 	}
 }
 
-void AddEnemies()
+void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl ,Camera& camera, std::mt19937& randomGen, float& enemyTimer, float enemyDelay, bool enemiesEnabled, std::uniform_real_distribution<float>& spawnDirection, std::uniform_real_distribution<float>& spawnHeight, std::uniform_int_distribution<int>& spawnQuadrant)
 {
-	if (enemyTimer > enemyDelay)
+	if (enemyTimer > enemyDelay && enemiesEnabled)
 	{
 		enemyTimer = 0;
 		auto playerPos = camera.getPos();
-		std::uniform_real_distribution<float> spawnDirection = std::uniform_real_distribution<float>(0.0f, 90.0f);
-		std::uniform_real_distribution<float> spawnHeight = std::uniform_real_distribution<float>(0.1f, 10.0f);
-		std::uniform_int_distribution<int> spawnQuadrant = std::uniform_int_distribution<int>(0, 1);
-		auto direction = glm::vec3(spawnDirection(mRandomGen), spawnHeight(mRandomGen), spawnDirection(mRandomGen));
+		auto direction = glm::vec3(spawnDirection(randomGen), spawnHeight(randomGen), spawnDirection(randomGen));
 		direction.x = cos(glm::radians(direction.x));
 		direction.z = sin(glm::radians(direction.z));
-		if (spawnQuadrant(mRandomGen) == 0)
+		if (spawnQuadrant(randomGen) == 0)
 			direction.x *= -1;
-		if (spawnQuadrant(mRandomGen) == 0)
+		if (spawnQuadrant(randomGen) == 0)
 			direction.z *= -1;
 		direction.x *= (camera.getRenderDistance() + 10.0f);
 		direction.z *= (camera.getRenderDistance() + 10.0f);
@@ -361,5 +431,5 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
-	camera.CursorPosCallback(window, xpos, ypos, TimeElapsed);
+	
 }
