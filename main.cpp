@@ -56,6 +56,7 @@ int main()
 
 	std::vector<Enemy> enemies;
 	bool enemiesEnabled = true;
+	bool holdingButton = false;
 	float enemyDelay = 6.0f;
 	const float INITIAL_ENEMY_DELAY = 6.0f;
 	float enemyTimer = 0.0f;
@@ -73,7 +74,7 @@ int main()
 
 	Model groundMdl;
 	Model treeMdl;
-	Model bulletMdl;
+	Model projectileMdl;
 	Model enemyMdl;
 	Model skyModel;
 	glm::vec3 skyBoxColour = glm::vec3(91.0f / 255.0f, 110.0f / 255.0f, 225.0f / 255.0f);
@@ -148,7 +149,7 @@ int main()
 
 	groundMdl = Model("assets/ground.obj");
 	treeMdl = Model("assets/tree.obj");
-	bulletMdl = Model("assets/bullet.obj");
+	projectileMdl = Model("assets/bullet.obj");
 	enemyMdl = Model("assets/enemy.obj");
 	skyModel = Model("assets/sky.obj");
 
@@ -215,17 +216,24 @@ int main()
 		camera.CursorPosCallback(window, xPos, yPos, TimeElapsed);
 		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
 		{
-			AddProjectile(projectiles, camera, bulletMdl, shotTimer, SHOT_DELAY);
+			AddProjectile(projectiles, camera, projectileMdl, shotTimer, SHOT_DELAY);
 		}
 		if (glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS)
 		{
 			chunks.clear();
 		}
-		if (glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS)
+		if (glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS && !holdingButton)
 		{
-			chunks.clear();
+			enemiesEnabled = !enemiesEnabled;
+			holdingButton = true;
 			enemies.clear();
-			projectiles.clear();
+		}
+		if (holdingButton)
+		{
+			if (glfwGetKey(window, GLFW_KEY_F2) == GLFW_RELEASE)
+			{
+				holdingButton = false;
+			}
 		}
 
 
@@ -379,17 +387,17 @@ void AddChunks(Camera& camera, std::vector<Chunk>& chunks, glm::vec3 currentSqua
 			if (!chunkFound)
 			{
 				//std::cout << "chunk added" << std::endl;
-				chunks.push_back(Chunk(glm::vec3(x, 1.0f, z), chunkWidth, chunkHeight, &groundMdl, &treeMdl, randomGen, spawnXRange, spawnZRange, treeRange));
+				chunks.push_back(Chunk(glm::vec3(x, 0.0f, z), chunkWidth, chunkHeight, &groundMdl, &treeMdl, randomGen, spawnXRange, spawnZRange, treeRange));
 			}
 		}
 	}
 }
 
-void AddProjectile(std::vector<Projectile>& projectiles, Camera& camera, Model& bulletMdl, float& shotTimer, float SHOT_DELAY)
+void AddProjectile(std::vector<Projectile>& projectiles, Camera& camera, Model& projectileMdl, float& shotTimer, float SHOT_DELAY)
 {
 	if (shotTimer > SHOT_DELAY)
 	{
-		projectiles.push_back(Projectile(camera.getPos(), glm::normalize(camera.getFront()), &bulletMdl));
+		projectiles.push_back(Projectile(camera.getPos(), glm::normalize(camera.getFront()), &projectileMdl));
 		shotTimer = 0.0f;
 	}
 }

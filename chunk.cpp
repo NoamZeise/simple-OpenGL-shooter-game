@@ -23,11 +23,11 @@ Chunk::Chunk(glm::vec3 position, float chunkWidth, float chunkHeight, Model* gro
 	for (unsigned int i = 0; i < numTrees; i++)
 	{
 		glm::vec3 pos = position;
+		pos.y = 0.0f;
 		pos.x += spawnXRange(randomGen);
 		pos.z += spawnZRange(randomGen);
 		treePositions.push_back(pos);
 	}
-	std::cout << std::endl;
 }
 Chunk::~Chunk()
 {

@@ -74,3 +74,6 @@ file.json
 file
 .vscode/settings.json
 highscore
+x64/Release/Projectile.obj
+x64/Release/gameObject.obj
+x64/Release/enemy.obj
