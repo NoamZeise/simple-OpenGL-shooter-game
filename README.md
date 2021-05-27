@@ -6,11 +6,15 @@
  Controls:
  
   Arrow Keys  - Move position
+  
   Mouse       - Move view
+  
   Mouse Right - Shoot
+  
   Left Shift  - Sprint
  
   F1          - regenerate chunks
+  
   F2          - toggle enemies
  
  
