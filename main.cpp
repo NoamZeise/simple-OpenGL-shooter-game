@@ -103,11 +103,11 @@ int main()
 	numChunks = 3;
 
 
-	groundMdl = Model("forest/ground.obj");
-	treeMdl = Model("forest/tree.obj");
-	bulletMdl = Model("forest/bullet.obj");
-	enemyMdl = Model("forest/enemy.obj");
-	skyModel = Model("forest/sky.obj");
+	groundMdl = Model("assets/ground.obj");
+	treeMdl = Model("assets/tree.obj");
+	bulletMdl = Model("assets/bullet.obj");
+	enemyMdl = Model("assets/enemy.obj");
+	skyModel = Model("assets/sky.obj");
 
 	while (!glfwWindowShouldClose(window))
 	{
