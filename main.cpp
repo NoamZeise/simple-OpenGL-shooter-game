@@ -136,7 +136,7 @@ int main()
 		danger = 0.0f;
 		for (unsigned int i = 0; i < enemies.size(); i++)
 		{
-			if (glm::distance(enemies[i].getPos(), camera.getPos()) < 15.0f)
+			if (glm::distance(enemies[i].getPos(), camera.getPos()) < 30.0f)
 			{
 				auto tempDanger =  1.0f - ((glm::distance(enemies[i].getPos(), camera.getPos()) + 1.0f) / 16.0f);
 				if (tempDanger > danger)
