@@ -26,7 +26,7 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 void saveHighscore(int& score, int& highscore);
 void AddChunks(Camera& camera, std::vector<Chunk>& chunks, glm::vec3 currentSquare, int numChunks, float chunkWidth, float chunkHeight, Model& groundMdl, Model& treeMdl, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnXRange, std::uniform_real_distribution<float>& spawnZRange, std::uniform_int_distribution<int>& treeRange);
 void AddProjectile(std::vector<Projectile>& projectiles, Camera& camera, Model& bulletMdl, float& shotTimer, float SHOT_DELAY);
-void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl, Camera& camera, std::mt19937& randomGen, float& enemyTimer, float enemyDelay, bool enemiesEnabled, std::uniform_real_distribution<float>& spawnDirection, std::uniform_real_distribution<float>& spawnHeight, std::uniform_int_distribution<int>& spawnQuadrant);
+void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl, Camera& camera, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnDirection, std::uniform_real_distribution<float>& spawnHeight, std::uniform_int_distribution<int>& spawnQuadrant);
 
 int main()
 {
@@ -157,49 +157,10 @@ int main()
 	{
 		//main loop
 
-		//update
+
 		float currentFrame = (float)glfwGetTime();
 		TimeElapsed = currentFrame - PreviousFrameTime;
 		PreviousFrameTime = currentFrame;
-		for (unsigned int i = 0; i < projectiles.size(); i++)
-		{
-			bool collided = false;
-			for (unsigned int j = 0; j < enemies.size(); j++)
-			{
-				if (enemies[j].Colliding(projectiles[i].getPos()))
-				{
-					enemies.erase(enemies.begin() + j--);
-					collided = true;
-					score++;
-					std::cout << "\n\n\n\n\n\n\n\n\n\n\nHighscore: " << highscore <<  "\nScore:     " << score << std::endl;
-				}
-			}
-			if (collided)
-			{
-				projectiles.erase(projectiles.begin() + i--);
-			}
-		}
-		danger = 0.0f;
-		for (unsigned int i = 0; i < enemies.size(); i++)
-		{
-			if (glm::distance(enemies[i].getPos(), camera.getPos()) < DANGER_RANGE)
-			{
-				auto tempDanger =  1.0f - ((glm::distance(enemies[i].getPos(), camera.getPos()) + 1.0f) / DANGER_RANGE);
-				if (tempDanger > danger)
-					danger = tempDanger;
-			}
-			if (enemies[i].Colliding(camera.getPos()))
-			{
-				enemies.clear();
-				projectiles.clear();
-				chunks.clear();
-				std::cout << "\n\n\n\n\n\n\n\n\n\n\nYOU DIED\nHighscore: " << highscore << "\nFinal Score: " << score << std::endl;
-				if(score > highscore)
-					highscore = score;
-				score = 0;
-				enemyDelay = INITIAL_ENEMY_DELAY;
-			}
-		}
 
 		difficultyTimer += TimeElapsed;
 		if (difficultyTimer > DIFFICULTY_DELAY)
@@ -235,12 +196,12 @@ int main()
 				holdingButton = false;
 			}
 		}
-
-
-		AddEnemies(enemies, enemyMdl, camera, randomGen, enemyTimer, enemyDelay, enemiesEnabled, spawnDirection, spawnHeight, spawnQuadrant);
-
+		if (enemyTimer > enemyDelay && enemiesEnabled)
+		{
+			enemyTimer = 0;
+			AddEnemies(enemies, enemyMdl, camera, randomGen, spawnDirection, spawnHeight, spawnQuadrant);
+		}
 		//-----------------------------------------
-		//draw
 		glClearColor(0.2f, 0.2f, 0.22f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -324,22 +285,61 @@ int main()
 		shotTimer += TimeElapsed;
 		for (unsigned int i = 0; i < projectiles.size(); i++)
 		{
-			projectiles[i].Update(TimeElapsed);
-			projectiles[i].Draw(objectShader, camera);
-
-			if (glm::distance(projectiles[i].getPos(), camera.getPos()) > range * 2)
+			bool collided = false;
+			for (unsigned int j = 0; j < enemies.size(); j++)
+			{
+				if (enemies[j].Colliding(projectiles[i].getPos()))
+				{
+					enemies.erase(enemies.begin() + j--);
+					collided = true;
+					score++;
+					std::cout << "\nHighscore: " << highscore << "\nScore:     " << score << std::endl;
+				}
+			}
+			if (collided)
 			{
 				projectiles.erase(projectiles.begin() + i--);
 			}
+			else
+			{
+				projectiles[i].Update(TimeElapsed);
+				projectiles[i].Draw(objectShader, camera);
+
+				if (glm::distance(projectiles[i].getPos(), camera.getPos()) > range * 2)
+				{
+					projectiles.erase(projectiles.begin() + i--);
+				}
+			}
 		}
+		danger = 0.0f;
 		enemyTimer += TimeElapsed;
 		for (unsigned int i = 0; i < enemies.size(); i++)
 		{
-			enemies[i].Update(TimeElapsed);
-			enemies[i].Draw(objectShader, camera);
-			auto pos = camera.getPos();
-			pos.y -= 0.3f;
-			enemies[i].UpdateVelocity(glm::normalize(pos - enemies[i].getPos()));
+			if (glm::distance(enemies[i].getPos(), camera.getPos()) < DANGER_RANGE)
+			{
+				auto tempDanger = 1.0f - ((glm::distance(enemies[i].getPos(), camera.getPos()) + 1.0f) / DANGER_RANGE);
+				if (tempDanger > danger)
+					danger = tempDanger;
+			}
+			if (enemies[i].Colliding(camera.getPos()))
+			{
+				enemies.clear();
+				projectiles.clear();
+				chunks.clear();
+				std::cout << "\nYOU DIED\nHighscore: " << highscore << "\nFinal Score: " << score << std::endl;
+				if (score > highscore)
+					highscore = score;
+				score = 0;
+				enemyDelay = INITIAL_ENEMY_DELAY;
+			}
+			else
+			{
+				enemies[i].Update(TimeElapsed);
+				enemies[i].Draw(objectShader, camera);
+				auto pos = camera.getPos();
+				pos.y -= 0.3f;
+				enemies[i].UpdateVelocity(glm::normalize(pos - enemies[i].getPos()));
+			}
 		}
 		//-------------------------------------
 		glfwPollEvents();
@@ -402,11 +402,8 @@ void AddProjectile(std::vector<Projectile>& projectiles, Camera& camera, Model& 
 	}
 }
 
-void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl ,Camera& camera, std::mt19937& randomGen, float& enemyTimer, float enemyDelay, bool enemiesEnabled, std::uniform_real_distribution<float>& spawnDirection, std::uniform_real_distribution<float>& spawnHeight, std::uniform_int_distribution<int>& spawnQuadrant)
+void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl ,Camera& camera, std::mt19937& randomGen, std::uniform_real_distribution<float>& spawnDirection, std::uniform_real_distribution<float>& spawnHeight, std::uniform_int_distribution<int>& spawnQuadrant)
 {
-	if (enemyTimer > enemyDelay && enemiesEnabled)
-	{
-		enemyTimer = 0;
 		auto playerPos = camera.getPos();
 		auto direction = glm::vec3(spawnDirection(randomGen), spawnHeight(randomGen), spawnDirection(randomGen));
 		direction.x = cos(glm::radians(direction.x));
@@ -422,7 +419,6 @@ void AddEnemies(std::vector<Enemy>& enemies, Model& enemyMdl ,Camera& camera, st
 		//std::cout << "x: " << direction.x << std::endl;
 		//std::cout << "z: " << direction.z << std::endl;
 		enemies.push_back(Enemy(direction, &enemyMdl));
-	}
 }
 
 static void error_callback(int error, const char* description)
