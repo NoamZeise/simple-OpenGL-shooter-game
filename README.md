@@ -5,12 +5,17 @@
  
  Controls:
  
- | Arrow Keys  - Move position
- | Mouse       - Move view
- | Mouse Right - Shoot
+  Arrow Keys  - Move position
+  
+  Mouse       - Move view
+  
+  Mouse Right - Shoot
+  
+  Left Shift  - Sprint
  
- | F1          - regenerate chunks
- | F2          - toggle enemies
+  F1          - regenerate chunks
+  
+  F2          - toggle enemies
  
  
 The game loads models and stores them in a model and mesh class. I first import the models with assimp then transfer the models and meshes into my classes.
